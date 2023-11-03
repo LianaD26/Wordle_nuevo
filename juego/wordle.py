@@ -131,18 +131,17 @@ class PalabraJuego:
 
         self.resultado_ventana = tk.Toplevel(self.ventana)
         self.resultado_ventana.title("Resultados")
-        # Read the game results from the text file
+        # leer los resultados del juego
         with open(HISTORIAL_JUEGOS_FILE, "r") as file:
             historial = file.readlines()
 
-        # Calculate statistics
+        # Calcular estadísticas
         partidas_jugadas = len(historial)
         victorias = historial.count("Victoria\n")
         racha_actual = 0
         mejor_racha = 0
         intentos_frecuencia = {}
 
-        # Display statistics in the new window
         tk.Label(self.resultado_ventana, text=f"Partidas Jugadas: {partidas_jugadas}", font=("Courier", 12)).pack()
 
         if partidas_jugadas > 0:
@@ -154,9 +153,9 @@ class PalabraJuego:
         tk.Label(self.resultado_ventana, text=f"Racha Actual: {racha_actual}", font=("Courier", 12)).pack()
         tk.Label(self.resultado_ventana, text=f"Mejor Racha: {mejor_racha}", font=("Courier", 12)).pack()
 
-        # Count the frequency of attempts
+        # Conteo de los intentos
         for juego in historial:
-            intentos = juego.count("_")  # Assuming "_" represents a failed attempt
+            intentos = juego.count("_")  # el _ es un intento fallido
             if intentos in intentos_frecuencia:
                 intentos_frecuencia[intentos] += 1
             else:
@@ -167,7 +166,6 @@ class PalabraJuego:
             for intentos, frecuencia in intentos_frecuencia.items():
                 tk.Label(self.resultado_ventana, text=f"{intentos} intentos: {frecuencia}", font=("Courier", 12)).pack()
 
-        # Extract and display the correct word from the last game result
         if historial:
             last_result = historial[-1]
             last_correct_word = last_result.split(":")[1].strip()
