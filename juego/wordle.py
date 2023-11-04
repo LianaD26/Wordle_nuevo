@@ -1,181 +1,258 @@
 import textwrap
-import tkinter as tk
+from tkinter import *
 import requests
 import time
+import os
+import matplotlib.pyplot as plt
 
-HISTORIAL_JUEGOS_FILE = "historial_juegos.txt"
+historial_juegos_file = "historial_juegos.txt"
+
+if not os.path.exists(historial_juegos_file):
+    with open(historial_juegos_file, "w") as file:
+        pass
+
+class WordFetcher:
+    def get_random_word(self, length):
+        random_word_api_url = "https://random-word-api.herokuapp.com/word"
+        random_word_api_response = requests.get(random_word_api_url, params={"length": length, "lang": "en"})
+        random_word = random_word_api_response.json()[0]
+        return random_word
+
+    def get_word_definition(self, word):
+        url = "https://api.dictionaryapi.dev/api/v2/entries/en/{}"
+        response = requests.get(url.format(word))
+        return response
+
+    def get_random_word_with_meaning(self, length):
+        status_code = 404
+
+        while status_code != 200:
+            word = self.get_random_word(length)
+            meaning_response = self.get_word_definition(word)
+            status_code = meaning_response.status_code
+
+        definition = meaning_response.json()[0]["meanings"][0]["definitions"][0]["definition"]
+
+        random_word = {
+            'word': word,
+            'definition': definition
+        }
+
+        return random_word
 
 class Tablero:
     def __init__(self, palabra_correcta):
         self.num_intentos = 0
-        self.matriz = [["_" for _ in range(5)] for _ in range(6)]
+        self.matriz = []
         self.palabra_correcta = palabra_correcta
+        self.llenar_matriz()
+
+    def llenar_matriz(self):
+        for i in range(6):
+            self.matriz.append(["_" for _ in range(5)])
 
     def actualizar_tablero(self, palabra):
+
         if self.num_intentos < 6:
             if palabra == self.palabra_correcta:
-                self.matriz[self.num_intentos] = list(palabra)
+                for i, letra in enumerate(palabra):
+                    self.matriz[self.num_intentos][i] = letra
                 self.num_intentos = 6
+                return
             else:
-                self.actualizar_matriz(palabra)
+                for i, letra in enumerate(palabra):
+                    if letra == self.palabra_correcta[i]:
+                        self.matriz[self.num_intentos][i] = letra
+                    elif letra in self.palabra_correcta:
+                        self.matriz[self.num_intentos][i] = letra.lower()
+                    else:
+                        self.matriz[self.num_intentos][i] = letra
                 self.num_intentos += 1
-
-    def actualizar_matriz(self, palabra):
-        for i, letra in enumerate(palabra):
-            if letra == self.palabra_correcta[i]:
-                self.matriz[self.num_intentos][i] = letra
-            elif letra in self.palabra_correcta:
-                self.matriz[self.num_intentos][i] = letra.lower()
-            else:
-                self.matriz[self.num_intentos][i] = letra
 
 class PalabraJuego:
     def __init__(self, ventana):
         self.ventana = ventana
-        self.inicializar_ventana()
-        self.palabra_correcta = self.get_random_word(5)
-        self.tablero = Tablero(self.palabra_correcta)
-        self.resultado_ventana = None
-        self.cronometro_corriendo = False
-
-    def inicializar_ventana(self):
         self.ventana.title("Wordle")
         self.ventana.configure(bg="white")
+
         for i in range(11):
             self.ventana.rowconfigure(i, weight=1)
         for j in range(5):
             self.ventana.columnconfigure(j, weight=1)
-        self.crear_interfaz()
 
-    def crear_interfaz(self):
-        self.etiqueta = self.crear_label("WORDLE", 0, 0, 5, "nsew", ("Courier", 16))
-        self.etiqueta_palabra = self.crear_label("Ingresa una palabra de 5 letras en minúsculas:", 1, 0, 5, "nsew", ("Courier", 12))
-        self.entrada_palabra = self.crear_entry(2, 0, 5, "nsew", ("Courier", 12))
-        self.etiqueta_error = self.crear_label("", 4, 0, 5, "nsew", ("Courier", 12))
-        self.etiqueta_tablero = self.crear_label("", 11, 0, 5, "nsew", ("Courier", 16))
-        self.crear_tablero_labels()
-        self.etiqueta_cronometro = self.crear_label("Tiempo: 00:00", 11, 5, "nsew", ("Courier", 12))
-        self.boton_reiniciar = self.crear_button("Reiniciar Juego", self.reiniciar_juego, 5, 5, 5, "nsew", ("Courier", 12))
-        self.boton_salir = self.crear_button("Salir", self.ventana.quit, 6, 5, 5, "nsew", ("Courier", 12))
-        self.boton_adivinar = self.crear_button("Adivinar", self.adivinar_palabra, 3, 0, 5, "nsew", ("Courier", 12))
+        self.word_fetcher = WordFetcher()
+        self.palabra_correcta = self.word_fetcher.get_random_word(5)
+        self.tablero = Tablero(self.palabra_correcta)
 
-    def crear_label(self, text, row, column, colspan, sticky, font):
-        label = tk.Label(self.ventana, text=text, font=font)
-        label.grid(row=row, column=column, columnspan=colspan, sticky=sticky)
-        return label
+        self.etiqueta = Label(ventana, text="WORDLE", font=("Courier", 16))
+        self.etiqueta.grid(row=0, column=0, columnspan=5, sticky="nsew")
 
-    def crear_entry(self, row, column, colspan, sticky, font):
-        entry = tk.Entry(self.ventana, font=font)
-        entry.grid(row=row, column=column, columnspan=colspan, sticky=sticky)
-        return entry
+        self.etiqueta_palabra = Label(ventana, text="Ingresa una palabra de 5 letras en minúsculas:",
+                                      font=("Courier", 12))
+        self.etiqueta_palabra.grid(row=1, column=0, columnspan=5, sticky="nsew")
 
-    def crear_button(self, text, command, row, column, colspan, sticky, font):
-        button = tk.Button(self.ventana, text=text, command=command, font=font)
-        button.grid(row=row, column=column, columnspan=colspan, sticky=sticky)
-        return button
+        self.entrada_palabra = Entry(ventana, font=("Courier", 12))
+        self.entrada_palabra.grid(row=2, column=0, columnspan=5, sticky="nsew")
 
-    def crear_tablero_labels(self):
+        self.etiqueta_error = Label(ventana, text="", fg="red", font=("Courier", 12))
+        self.etiqueta_error.grid(row=4, column=0, columnspan=5, sticky="nsew")
+
+        self.etiqueta_tablero = Label(ventana, text="", font=("Courier", 16))
+        self.etiqueta_tablero.grid(row=11, column=0, columnspan=5, sticky="nsew")
+
         self.tablero_labels = []
         for i in range(6):
             fila_labels = []
             for j in range(5):
-                label = tk.Label(self.ventana, text="", width=2, height=1, font=("Courier", 16),
-                                 relief="solid", borderwidth=1)
+                label = Label(ventana, text="", width=2, height=1, font=("Courier", 16),
+                              relief="solid", borderwidth=1)
                 label.grid(row=i + 5, column=j, sticky="nsew")
                 fila_labels.append(label)
             self.tablero_labels.append(fila_labels)
 
+        self.tiempo_inicio = None
+        self.cronometro_corriendo = False
+
+        self.etiqueta_cronometro = Label(ventana, text="Tiempo: 00:00", font=("Courier", 12))
+        self.etiqueta_cronometro.grid(row=11, column=5, sticky="nsew")
+
+        self.resultado_ventana = None
+
+        self.boton_reiniciar = Button(ventana, text="Reiniciar Juego", command=self.reiniciar_juego,
+                                      font=("Courier", 12))
+        self.boton_reiniciar.grid(row=5, column=5, columnspan=5, sticky="nsew")
+
+        self.boton_salir = Button(ventana, text="Salir", command=ventana.quit, font=("Courier", 12))
+        self.boton_salir.grid(row=6, column=5, columnspan=5, sticky="nsew")
+
+        self.boton_adivinar = Button(ventana, text="Adivinar", command=self.adivinar_palabra, font=("Courier", 12))
+        self.boton_adivinar.grid(row=3, column=0, columnspan=5, sticky="nsew")
+
     def reiniciar_juego(self):
-        self.palabra_correcta = self.get_random_word(5)
+        self.palabra_correcta = self.word_fetcher.get_random_word(5)
         self.tablero = Tablero(self.palabra_correcta)
-        self.entrada_palabra.delete(0, tk.END)
+        self.entrada_palabra.delete(0, END)
         self.etiqueta_error.config(text="")
         self.etiqueta_tablero.config(text="")
         self.actualizar_tablero()
         self.tiempo_inicio = None
         self.cronometro_corriendo = False
         self.etiqueta_cronometro.config(text="Tiempo: 00:00")
-        if self.resultado_ventana:
-            self.resultado_ventana.destroy()
+        self.resultado_ventana.destroy() if self.resultado_ventana else None
         self.boton_adivinar.config(state="normal")
 
     def adivinar_palabra(self):
+
         palabra = self.entrada_palabra.get()
+
         if not self.cronometro_corriendo:
             self.iniciar_cronometro()
             self.cronometro_corriendo = True
 
         if len(palabra) == 5 and palabra.isalpha() and palabra.islower():
+
             self.etiqueta_error.config(text="")
             self.tablero.actualizar_tablero(palabra)
             self.actualizar_tablero()
-            if "".join(self.tablero.matriz[self.tablero.num_intentos - 1]) == self.palabra_correcta:
+
+            if palabra == self.palabra_correcta:
                 self.etiqueta_tablero.config(text="¡Has adivinado la palabra!")
                 self.detener_cronometro()
-                self.guardar_resultado(self.palabra_correcta, palabra, "Victoria")
-                self.mostrar_resultados()
+                self.mostrar_resultados(resultado="Victoria")
                 self.boton_adivinar.config(state="disabled")
-            elif self.tablero.num_intentos == 6:
-                self.etiqueta_tablero.config(
-                    text=f"¡Agotaste tus intentos! La palabra correcta era: {self.palabra_correcta}")
-                self.detener_cronometro()
-                self.guardar_resultado(self.palabra_correcta, palabra, "Derrota")
-                self.mostrar_resultados()
-                self.boton_adivinar.config(state="disabled")
+
+            else:
+                if self.tablero.num_intentos == 6:
+                    self.etiqueta_tablero.config(
+                        text=f"¡Agotaste tus intentos! La palabra correcta era: {self.palabra_correcta}")
+                    self.detener_cronometro()
+                    self.mostrar_resultados(resultado="Derrota")
+                    self.boton_adivinar.config(state="disabled")
+
+                else:
+                    # seguir jugando
+                    pass
+
         else:
             self.etiqueta_error.config(text="Por favor, ingresa una palabra válida de 5 letras en minúsculas.")
 
-    def mostrar_resultados(self):
+    def mostrar_resultados(self, resultado):
+
+        intentos = self.tablero.num_intentos
         if self.resultado_ventana:
             self.resultado_ventana.destroy()
 
-        self.resultado_ventana = tk.Toplevel(self.ventana)
+        self.resultado_ventana = Toplevel(self.ventana)
         self.resultado_ventana.title("Resultados")
-        # leer los resultados del juego
-        with open(HISTORIAL_JUEGOS_FILE, "r") as file:
-            historial = file.readlines()
 
-        # Calcular estadísticas
-        partidas_jugadas = len(historial)
-        victorias = historial.count("Victoria\n")
-        racha_actual = 0
-        mejor_racha = 0
-        intentos_frecuencia = {}
+        # Calcula estadísticas
+        partidas_jugadas, victorias, racha_actual, mejor_racha = self.calcular_estadisticas()
 
-        tk.Label(self.resultado_ventana, text=f"Partidas Jugadas: {partidas_jugadas}", font=("Courier", 12)).pack()
+        # Agrega el resultado actual al historial de juegos
+        self.guardar_resultado(self.palabra_correcta, self.entrada_palabra.get(), resultado, intentos)
+
+        # Obtener el significado de la palabra correcta
+        palabra_correcta = self.palabra_correcta
+        meaning_response = self.word_fetcher.get_word_definition(palabra_correcta)
+
+        if meaning_response.status_code == 200:
+            definition = meaning_response.json()[0]["meanings"][0]["definitions"][0]["definition"]
+        else:
+            definition = "No se encontró una definición para esta palabra."
+
+        # Muestra estadísticas en la nueva ventana
+        Label(self.resultado_ventana, text=f"Partidas Jugadas: {partidas_jugadas}", font=("Courier", 12)).pack()
 
         if partidas_jugadas > 0:
             porcentaje_victorias = (victorias / partidas_jugadas) * 100
         else:
             porcentaje_victorias = 0
 
-        tk.Label(self.resultado_ventana, text=f"% Victorias: {porcentaje_victorias:.2f}%", font=("Courier", 12)).pack()
-        tk.Label(self.resultado_ventana, text=f"Racha Actual: {racha_actual}", font=("Courier", 12)).pack()
-        tk.Label(self.resultado_ventana, text=f"Mejor Racha: {mejor_racha}", font=("Courier", 12)).pack()
+        Label(self.resultado_ventana, text=f"% Victorias: {porcentaje_victorias:.2f}%", font=("Courier", 12)).pack()
+        Label(self.resultado_ventana, text=f"Racha Actual: {racha_actual}", font=("Courier", 12)).pack()
+        Label(self.resultado_ventana, text=f"Mejor Racha: {mejor_racha}", font=("Courier", 12)).pack()
 
-        # Conteo de los intentos
-        for juego in historial:
-            intentos = juego.count("_")  # el _ es un intento fallido
-            if intentos in intentos_frecuencia:
-                intentos_frecuencia[intentos] += 1
-            else:
-                intentos_frecuencia[intentos] = 1
+        # Muestra el significado de la palabra correcta o un mensaje de error
+        if definition == "No se encontró una definición para esta palabra.":
+            Label(self.resultado_ventana, text=f"Palabra correcta: {palabra_correcta}", font=("Courier", 12)).pack()
+            Label(self.resultado_ventana, text="Significado no encontrado.", font=("Courier", 12)).pack()
+        else:
+            significado_lineas = "\n".join(
+                textwrap.wrap(definition, width=40))  # Ajusta el texto a 40 caracteres por línea
+            Label(self.resultado_ventana, text=f"Palabra correcta: {palabra_correcta}", font=("Courier", 12)).pack()
+            Label(self.resultado_ventana, text=f"Significado:", font=("Courier", 12)).pack()
+            Label(self.resultado_ventana, text=significado_lineas, font=("Courier", 12)).pack()
 
-        if intentos_frecuencia:
-            tk.Label(self.resultado_ventana, text="Frecuencia de Intentos:", font=("Courier", 12)).pack()
-            for intentos, frecuencia in intentos_frecuencia.items():
-                tk.Label(self.resultado_ventana, text=f"{intentos} intentos: {frecuencia}", font=("Courier", 12)).pack()
+        self.mostrar_grafico(partidas_jugadas)
 
-        if historial:
-            last_result = historial[-1]
-            last_correct_word = last_result.split(":")[1].strip()
-            tk.Label(self.resultado_ventana, text=f"Palabra correcta del último juego: {last_correct_word}",
-                     font=("Courier", 12)).pack()
+    def calcular_estadisticas(self):
 
-    def guardar_resultado(self, palabra_correcta, palabra_ingresada, resultado):
-        resultado_texto = f"Palabra correcta: {palabra_correcta}, Palabra ingresada: {palabra_ingresada}, Resultado: {resultado}, Intentos: {self.tablero.num_intentos}\n"
-        with open(HISTORIAL_JUEGOS_FILE, "a") as file:
-            file.write(resultado_texto)
+        partidas_jugadas, victorias, racha_actual, mejor_racha = 0, 0, 0, 0
+
+        with open("historial_juegos.txt", "r") as file:
+            lines = file.readlines()
+
+            for line in lines:
+                if "Victoria" in line:
+                    victorias += 1
+
+                    intentos = int(line.split(", Intentos: ")[1])
+
+                    racha_actual += 1
+                    mejor_racha = max(mejor_racha, racha_actual)
+                else:
+                    racha_actual = 0
+
+            partidas_jugadas = len(lines)
+
+        return partidas_jugadas, victorias, racha_actual, mejor_racha
+
+    def guardar_resultado(self, palabra_correcta, palabra_ingresada, resultado, intentos):
+        historial_juegos_file = "historial_juegos.txt"
+
+        with open(historial_juegos_file, "a") as file:
+            file.write(
+                f"Palabra correcta: {palabra_correcta}, Palabra ingresada: {palabra_ingresada}, Resultado: {resultado}, Intentos: {intentos}\n")
 
     def iniciar_cronometro(self):
         self.tiempo_inicio = time.time()
@@ -211,19 +288,34 @@ class PalabraJuego:
                 else:
                     label.config(text=letra, bg="white")
 
-    def get_random_word(self, length):
-        random_word_api_url = "https://random-word-api.herokuapp.com/word"
-        random_word_api_response = requests.get(random_word_api_url, params={"length": length, "lang": "en"})
-        random_word = random_word_api_response.json()[0]
-        return random_word
+    def mostrar_grafico(self, partidas_jugadas):
+        # Contar la frecuencia de adivinanzas exitosas en cada cantidad de intentos
+        exitos_por_intentos = [0] * 6
+        with open("historial_juegos.txt", "r") as file:
+            lines = file.readlines()
+            for line in lines:
+                if "Victoria" in line:
+                    intentos = line.count("_")  # Contar los guiones bajos en la palabra correcta
+                    exitos_por_intentos[intentos] += 1
 
-    def get_word_definition(self, word):
-        url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
-        response = requests.get(url)
-        return response
+        # Etiquetas para el eje X del gráfico
+        labels = [f"{i} intentos" for i in range(1, 7)]
+
+        # Crear el gráfico de barras
+        plt.figure(figsize=(10, 6))
+        plt.bar(labels, exitos_por_intentos, color='lightblue')
+        plt.xlabel('Intentos')
+        plt.ylabel('Frecuencia de Adivinanzas Exitosas')
+        plt.title('Frecuencia de Adivinanzas Exitosas por Cantidad de Intentos')
+        plt.tight_layout()
+
+        # Mostrar el gráfico
+        plt.show()
+
+ventana = Tk()
 
 if __name__ == "__main__":
-    ventana = tk.Tk()
     ventana.configure(bg="white")
     juego = PalabraJuego(ventana)
     ventana.mainloop()
+
