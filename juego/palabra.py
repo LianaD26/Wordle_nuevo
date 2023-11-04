@@ -4,6 +4,7 @@ import time
 import matplotlib.pyplot as plt
 from juego.api import WordFetcher
 from juego.tablero import Tablero
+import requests
 
 class PalabraJuego:
     def __init__(self, ventana):
@@ -83,36 +84,42 @@ class PalabraJuego:
             self.iniciar_cronometro()
             self.cronometro_corriendo = True
 
-        if len(palabra) == 5 and palabra.isalpha() and palabra.islower():
-            self.etiqueta_error.config(text="")
-            self.tablero.actualizar_tablero(palabra)
-            self.actualizar_tablero()
+        valid_words_api_url = "https://random-word-api.herokuapp.com/all"
+        valid_words_response = requests.get(valid_words_api_url)
 
-            if palabra == self.palabra_correcta:
-                self.etiqueta_tablero.config(text="¡Has adivinado la palabra!")
-                self.detener_cronometro()
-                self.mostrar_resultados(resultado="Victoria")
-                self.boton_adivinar.config(state="disabled")
+        if valid_words_response.status_code == 200:
+            valid_words = valid_words_response.json()
 
-                # Llamar aquí a guardar resultado
-                intentos = self.intentos + 1
-                self.guardar_resultado(self.palabra_correcta, palabra, "Victoria", intentos)
+            if palabra in valid_words:
+                self.etiqueta_error.config(text="")
+                self.tablero.actualizar_tablero(palabra)
+                self.actualizar_tablero()
 
-            else:
-                self.intentos += 1
-                if self.tablero.num_intentos == 6:
-                    self.etiqueta_tablero.config(
-                        text=f"¡Agotaste tus intentos! La palabra correcta era: {self.palabra_correcta}")
+                if palabra == self.palabra_correcta:
+                    self.etiqueta_tablero.config(text="¡Has adivinado la palabra!")
                     self.detener_cronometro()
-                    self.mostrar_resultados(resultado="Derrota")
+                    self.mostrar_resultados(resultado="Victoria")
                     self.boton_adivinar.config(state="disabled")
 
-                    intentos = 6
-                    self.guardar_resultado(self.palabra_correcta, palabra, "Derrota", intentos)
+                    # Llamar aquí a guardar resultado
+                    intentos = self.intentos + 1
+                    self.guardar_resultado(self.palabra_correcta, palabra, "Victoria", intentos)
                 else:
-                    pass
+                    self.intentos += 1
+                    if self.tablero.num_intentos == 6:
+                        self.etiqueta_tablero.config(
+                            text=f"¡Agotaste tus intentos! La palabra correcta era: {self.palabra_correcta}")
+                        self.detener_cronometro()
+                        self.mostrar_resultados(resultado="Derrota")
+                        self.boton_adivinar.config(state="disabled")
+
+                        intentos = 6
+                        self.guardar_resultado(self.palabra_correcta, palabra, "Derrota", intentos)
+            else:
+                self.etiqueta_error.config(
+                    text="Por favor, ingresa una palabra válida que exista en la lista de palabras.")
         else:
-            self.etiqueta_error.config(text="Por favor, ingresa una palabra válida de 5 letras en minúsculas.")
+            self.etiqueta_error.config(text="No se pudo obtener la lista de palabras válidas desde la API.")
 
     # Resto del método
     def mostrar_resultados(self, resultado):
@@ -131,8 +138,6 @@ class PalabraJuego:
 
         # Obtener el significado de la palabra correcta
         palabra_correcta = self.palabra_correcta
-        meaning_response = self.api.get_word_definition(palabra_correcta)
-
         definition = self.api.get_random_word_with_meaning()
 
         # Muestra estadísticas en la nueva ventana
@@ -158,7 +163,7 @@ class PalabraJuego:
             Label(self.resultado_ventana, text=f"Significado:", font=("Courier", 12)).pack()
             Label(self.resultado_ventana, text=significado_lineas, font=("Courier", 12)).pack()
 
-        self.mostrar_grafico(partidas_jugadas)
+        self.mostrar_grafico()
     def calcular_estadisticas(self):
 
         partidas_jugadas, victorias, racha_actual, mejor_racha = 0, 0, 0, 0
@@ -169,10 +174,6 @@ class PalabraJuego:
             for line in lines:
                 if "Victoria" in line:
                     victorias += 1
-
-                    # Aquí agregas la línea para leer los intentos
-                    intentos = int(line.split(", Intentos: ")[1])
-
                     racha_actual += 1
                     mejor_racha = max(mejor_racha, racha_actual)
                 else:
@@ -228,7 +229,7 @@ class PalabraJuego:
                 else:
                     label.config(text=letra, bg="white")
 
-    def mostrar_grafico(self, partidas_jugadas):
+    def mostrar_grafico(self):
         # Contar la frecuencia de adivinanzas exitosas en cada cantidad de intentos
         exitos_por_intentos = [0] * 6
         with open("historial_juegos.txt", "r") as file:

@@ -1,19 +1,31 @@
-import requests, json
+import requests
 
 class WordFetcher:
     def __init__(self):
         self.api_url = "https://random-word-api.herokuapp.com/word"
 
     def get_random_word(self):
-        response = requests.get(self.api_url, params={"length": 5, "lang": "en"})# solicitud a la API
+        random_word_api_url = "https://random-word-api.herokuapp.com/word"
 
-        random_word = response.json()[0]
-        return random_word
+        try:
+            random_word_api_response = requests.get(
+                random_word_api_url, params={"length": 5, "lang": "en"})
+            random_word_api_response.raise_for_status()  #errores HTTP
+            random_word = random_word_api_response.json()[0]
+            return random_word
+        except requests.exceptions.RequestException as e:
+            print("Error al hacer la solicitud HTTP:", e)
+            return None
 
     def get_word_definition(self, word):
         url = "https://api.dictionaryapi.dev/api/v2/entries/en/{}"
-        response = requests.get(url.format(word))
-        return response
+        try:
+            response = requests.get(url.format(word))
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            print("Error al hacer la solicitud HTTP:", e)
+            return None
 
     def get_random_word_with_meaning(self):
         status_code = 404
