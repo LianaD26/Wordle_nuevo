@@ -1,4 +1,5 @@
 import requests, json
+
 class WordFetcher:
     def __init__(self):
         self.api_url = "https://random-word-api.herokuapp.com/word"
@@ -24,9 +25,4 @@ class WordFetcher:
 
         definition = meaning_response.json()[0]["meanings"][0]["definitions"][0]["definition"]
 
-        random_word = {
-            'word': word,
-            'definition': definition
-        }
-
-        return random_word
+        return definition
