@@ -79,38 +79,41 @@ class PalabraJuego:
     def adivinar_palabra(self):
 
         palabra = self.entrada_palabra.get()
+        wordfetcher = WordFetcher()
 
-        if not self.cronometro_corriendo:
-            self.iniciar_cronometro()
-            self.cronometro_corriendo = True
+        if wordfetcher.word_exists_in_api(palabra):
+            if not self.cronometro_corriendo:
+                self.iniciar_cronometro()
+                self.cronometro_corriendo = True
 
-        if len(palabra) == 5 and palabra.isalpha() and palabra.islower():
+            if len(palabra) == 5 and palabra.isalpha() and palabra.islower():
 
-            self.etiqueta_error.config(text="")
-            self.tablero.actualizar_tablero(palabra)
-            self.actualizar_tablero()
+                self.etiqueta_error.config(text="")
+                self.tablero.actualizar_tablero(palabra)
+                self.actualizar_tablero()
 
-            if palabra == self.palabra_correcta:
-                self.etiqueta_tablero.config(text="¡Has adivinado la palabra!")
-                self.detener_cronometro()
-                self.mostrar_resultados(resultado="Victoria")
-                self.boton_adivinar.config(state="disabled")
-
-            else:
-                if self.tablero.num_intentos == 6:
-                    self.etiqueta_tablero.config(
-                        text=f"¡Agotaste tus intentos! La palabra correcta era: {self.palabra_correcta}")
+                if palabra == self.palabra_correcta:
+                    self.etiqueta_tablero.config(text="¡Has adivinado la palabra!")
                     self.detener_cronometro()
-                    self.mostrar_resultados(resultado="Derrota")
+                    self.mostrar_resultados(resultado="Victoria")
                     self.boton_adivinar.config(state="disabled")
 
                 else:
-                    # seguir jugando
-                    pass
+                    if self.tablero.num_intentos == 6:
+                        self.etiqueta_tablero.config(
+                            text=f"¡Agotaste tus intentos! La palabra correcta era: {self.palabra_correcta}")
+                        self.detener_cronometro()
+                        self.mostrar_resultados(resultado="Derrota")
+                        self.boton_adivinar.config(state="disabled")
 
+                    else:
+                        # seguir jugando
+                        pass
+
+            else:
+                self.etiqueta_error.config(text="Por favor, ingresa una palabra válida de 5 letras en minúsculas.")
         else:
-            self.etiqueta_error.config(text="Por favor, ingresa una palabra válida de 5 letras en minúsculas.")
-
+            self.etiqueta_error.config(text="Por favor, ingresa una palabra que exista.")
     def mostrar_resultados(self, resultado):
 
         intentos = self.tablero.num_intentos

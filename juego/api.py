@@ -1,5 +1,19 @@
 import requests
 class WordFetcher:
+    def word_exists_in_api(self, palabra):
+        api_url = "https://random-word-api.herokuapp.com/word"
+        # solicitud a la API
+        response = requests.get(api_url, params={"length": 5, "lang": "en"})
+        # la condición verifica que se haya hecho la consulta con éxito
+        if response.status_code == 200:
+            palabras_disponibles = response.json()
+            if palabra in palabras_disponibles:
+                return True
+            else:
+                return False
+        else:
+            return False
+
     def get_random_word(self, length):
         random_word_api_url = "https://random-word-api.herokuapp.com/word"
         random_word_api_response = requests.get(random_word_api_url, params={"length": length, "lang": "en"})
